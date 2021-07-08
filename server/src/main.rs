@@ -1,53 +1,63 @@
-// #[macro_use]
-extern crate juniper;
-
+//! Actix web juniper example
+//!
+//! A simple example integrating juniper in actix-web
 use std::io;
 use std::sync::Arc;
 
-use actix_web::{web, App, Error, HttpResponse, HttpServer};
-use futures::future::Future;
+use actix_cors::Cors;
+use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer};
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 
-mod schema; //importin the todo schema
+mod schema;
 
-use crate::schema::{create_schema, Schema};  //creating
+use crate::schema::{create_schema, Schema};
 
-
-//main function [server]
-fn main() -> io::Result<()> {
-    let schema = std::sync::Arc::new(create_schema());
-    HttpServer::new(move || {
-        App::new()
-            .data(schema.clone())
-            .service(web::resource("/graphql").route(web::post().to_async(graphql)))
-            .service(web::resource("/graphiql").route(web::get().to(graphiql)))
-    })
-    .bind("localhost:3000")?
-    .run()
-}
-
-// function for the graphql interface  [not working]
-fn graphql(
-    st: web::Data<Arc<Schema>>,
-    data: web::Json<GraphQLRequest>,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    web::block(move || {
-        let res = data.execute(&st, &());
-        Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
-    })
-    .map_err(Error::from)
-    .and_then(|user| {
-        Ok(HttpResponse::Ok()
-            .content_type("application/json")
-            .body(user))
-    })
-}
-
-//for graphiql responses
-fn graphiql() -> HttpResponse {
-    let html = graphiql_source("http://localhost:3000/graphql");
+async fn graphiql() -> HttpResponse {
+    let html = graphiql_source("http://127.0.0.1:4001/graphql", None);
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(html)
+}
+
+async fn graphql(
+    st: web::Data<Arc<Schema>>,
+    data: web::Json<GraphQLRequest>,
+) -> Result<HttpResponse, Error> {
+    let user = web::block(move || {
+        let res = data.execute_sync(&st, &());
+        Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
+    })
+    .await?;
+    Ok(HttpResponse::Ok()
+        .content_type("application/json")
+        .body(user))
+}
+
+#[actix_web::main]
+async fn main() -> io::Result<()> {
+    std::env::set_var("RUST_LOG", "actix_web=info");
+    env_logger::init();
+
+    // Create Juniper schema
+    let schema = std::sync::Arc::new(create_schema());
+
+    // Start http server
+    HttpServer::new(move || {
+        App::new()
+            .data(schema.clone())
+            .wrap(middleware::Logger::default())
+            .wrap(
+                Cors::new()
+                    .allowed_methods(vec!["POST", "GET"])
+                    .supports_credentials()
+                    .max_age(3600)
+                    .finish(),
+            )
+            .service(web::resource("/graphql").route(web::post().to(graphql)))
+            .service(web::resource("/graphiql").route(web::get().to(graphiql)))
+    })
+    .bind("127.0.0.1:4001")?
+    .run()
+    .await
 }
