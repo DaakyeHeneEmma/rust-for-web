@@ -1,104 +1,63 @@
-// use juniper::{EmptyMutation, RootNode};
-
-// //the todo object
-// pub struct AllTodo {
-// title: String,
-// description: String,
-// }
-
-// //making the work
-// #[juniper::object(description = "A Todo App for Afrodew")]
-// impl AllTodo {
-// pub fn title(&self) -> String {
-// self.title.to_string()
-// }
-// pub fn description(&self) -> String {
-//     self.description.to_string()
-//         } 
-//     }
-
-// //creating an array of a todo
-// pub struct TodoApp;
-// #[juniper::object]
-// impl TodoApp {
-// fn Todos() -> Vec<AllTodo> {
-// vec![
-//     AllTodo {
-//         title: "Work".to_owned(),
-//         description: "Go to work at 8:00 am".to_owned(),
-//         }
-//      ]
-//   }  
-//  }
-        
-// //exporting the schema
-//  pub type Schema = RootNode<'static, TodoApp, EmptyMutation<()>>;  
-//  pub fn create_schema() -> Schema {
-//    Schema::new(TodoApp {}, EmptyMutation::new())
-//  }
-
-
-
 
 use juniper::FieldResult;
 use juniper::{EmptySubscription, RootNode};
-
-#[derive(GraphQLEnum)]
-enum Episode {
-    NewHope,
-    Empire,
-    Jedi,
-}
-
 use juniper::{GraphQLEnum, GraphQLInputObject, GraphQLObject};
 
+
+// Query Types
 #[derive(GraphQLObject)]
-#[graphql(description = "A humanoid creature in the Star Wars universe")]
-struct Human {
+#[graphql(description = "A todo")]
+struct Todo {
     id: String,
-    name: String,
-    appears_in: Vec<Episode>,
-    home_planet: String,
+    content: String,
+    completed_at: Option<String>,
+    created_at: String
 }
 
+
+
+// Input Types
 #[derive(GraphQLInputObject)]
-#[graphql(description = "A humanoid creature in the Star Wars universe")]
-struct NewHuman {
-    name: String,
-    appears_in: Vec<Episode>,
-    home_planet: String,
+#[graphql(description = "This is the input when creating a new todo")]
+struct CreateTodoInput {
+    content: String,
+    created_at: String
 }
 
-pub struct QueryRoot;
+
+
+// Queries
+pub struct Query;
 
 #[juniper::graphql_object]
-impl QueryRoot {
-    fn human(_id: String) -> FieldResult<Human> {
-        Ok(Human {
-            id: "1234".to_owned(),
-            name: "Luke".to_owned(),
-            appears_in: vec![Episode::NewHope],
-            home_planet: "Mars".to_owned(),
-        })
+impl Query {
+    fn todos() -> FieldResult<Vec<Todo>> {
+        Ok(vec![
+            Todo{id: "t1".to_string(), content: "Build house".to_string(), completed_at: None, created_at: "7/6/2021".to_string()},
+            Todo{id: "t2".to_string(), content: "Start company".to_string(), completed_at: Some("7/6/2021".to_string()), created_at: "7/6/2021".to_string()},
+            Todo{id: "t3".to_string(), content: "Improve Africa".to_string(), completed_at: None, created_at: "7/6/2021".to_string()},
+            Todo{id: "t4".to_string(), content: "Get a baby".to_string(), completed_at: None, created_at: "7/6/2021".to_string()},
+        ])
     }
 }
 
-pub struct MutationRoot;
+
+
+// Mutations
+pub struct Mutation;
 
 #[juniper::graphql_object]
-impl MutationRoot {
-    fn create_human(new_human: NewHuman) -> FieldResult<Human> {
-        Ok(Human {
-            id: "1234".to_owned(),
-            name: new_human.name,
-            appears_in: new_human.appears_in,
-            home_planet: new_human.home_planet,
-        })
+impl Mutation {
+    fn create_todo(todo: CreateTodoInput) -> FieldResult<Todo> {
+        Ok(Todo{id: "t5".to_string(), content: todo.content, completed_at: None, created_at: todo.created_at})
     }
 }
 
-pub type Schema = RootNode<'static, QueryRoot, MutationRoot, EmptySubscription>;
+
+
+// Schema
+pub type Schema = RootNode<'static, Query, Mutation, EmptySubscription>;
 
 pub fn create_schema() -> Schema {
-    Schema::new(QueryRoot {}, MutationRoot {}, EmptySubscription::new())
+    Schema::new(Query {}, Mutation {}, EmptySubscription::new())
 }
